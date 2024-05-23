@@ -1,0 +1,379 @@
+
+## Exercise 1 - Discrete random variable
+
+The probability distribution function of a discrete variable k is given by the zero-truncated Poisson distribution:
+P(k) = ((λ**k) * e**(−λ) ) / (k! * (1 − e**(−λ)) ) 
+for k = 1, 2, 3, . . .
+
+1) Write the R functions for the probability density and cumulative distribution functions, using the R naming convention.
+• Assuming λ = 1.4,
+
+```{r}
+library(actuar)
+
+lambda <- 1.4
+x <- seq(0,10)
+pois_pdf <- dztpois(x,lambda) #pdf
+pois_cdf <- pztpois(x, lambda) #cdf
+
+```
+
+
+2) Produce two plots showing the pdf and cdf, separately.
+
+```{r}
+barplot(pois_pdf , names=x, col="firebrick2", xlab="x", ylab="f(x)", density=50, main = sprintf("Poisson distr. lambda=%.2f",lambda), ylim=c(0,0.5), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+#plot(x,pois_pdf,type="l")
+print(pois_pdf)
+```
+
+```{r}
+barplot(pois_cdf , names=x, col="firebrick2", xlab="x", ylab="f(x)", density=50, main = sprintf("Poisson cdf. lambda=%.2f",lambda), ylim=c(0,1.1), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+#plot(x,pois_cdf,type="l")
+```
+
+
+3) Compute the mean value and variance of the probability distribution using R.
+
+```{r}
+mean = sum(pois_pdf*x)
+std = sum(pois_pdf*(x**2)) - mean**2
+cat("mean: ", mean, "\nstd: ", std, "\n")
+```
+
+
+
+4) Generate a sample of random numbers from this distribution and show them in an histogram.
+Evaluate the sample mean
+
+```{r}
+library(actuar)
+
+sampled_data = rztpois(1000, lambda=lambda)
+breaks = seq(1,10,1)
+hist(sampled_data, col="firebrick2", xlab="x", ylab="frequency", density=50, breaks=breaks, main = sprintf("Distribution of data sampled=%.2f",lambda), xlim=c(0,10))
+
+cat("mean sampled data: ", mean(sampled_data),"\nlambda: ", lambda,"\n")
+
+
+```
+
+
+
+
+
+# Exercise 2 - Continuous random variable
+• The energy distribution of CR muons at sea level can be approximated as follows
+p(E) = N{1 for E < E0; (E − E0 + 1)^(-γ) for E ≥ E0
+
+where E0 = 7.25 GeV and γ = 2.7.
+
+a) Compute the normalisation factor N using R.
+
+```{r}
+
+E0=7.25
+gam =2.7
+
+energy_pdf <- function(E) {
+
+    E0=7.25
+    gam =2.7
+
+    ifelse(E<E0 , 1, (E - E0 + 1)^(-gam))
+
+}
+
+integral <- integrate(energy_pdf, lower=0 , upper=Inf) #i consider the pdf domain in the lower limit: Energy cannot be 0
+
+N = 1 / integral$value
+
+cat("Normalization factor N = ", N)
+```
+
+b) Plot the probability density function in R.
+
+```{r}
+energy_pdf_normalized = function(E) {   
+    energy_pdf(E) * N
+}
+
+x = seq(0,15,0.25)
+y = energy_pdf_normalized(x)
+
+plot(x,y, type="l", col="darkblue", xlab="Energy (MeV)", ylab="Probability", ylim=c(0,0.2), main = sprintf("Energy probability distribution"), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+```
+
+c) Plot the cumulative density function in R.
+
+```{r}
+energy_cdf <- function(x) {
+    output = list()
+    for (i in x) {
+        output = c(output, integrate(energy_pdf_normalized, lower = 0, upper = i)$value)
+    }
+    return(as.numeric(output))
+}
+
+x1 = seq(0,30,0.25)
+y1 = energy_cdf(x1)
+
+plot(x1,y1, type="l", col="darkred", xlab="Energy (MeV)", ylab="Probability", ylim=c(0,1), main = sprintf("Energy cdf"), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+abline(h = 1, col = "black", lty = 2)  # Adjust color and line type as desired
+```
+
+d) Compute the mean value using R
+
+```{r}
+f = function(E){
+    energy_pdf_normalized(E)*E
+}
+
+mean = integrate(f, lower=0, upper = Inf)$value
+
+print(mean)
+```
+
+e) [Optional] Generate 1E06 random numbers from this distribution, show them in an histogram and
+superimpose the pdf (with a line or with a sufficient number of points)
+
+```{r}
+library(GoFKernel)
+
+# Generate random numbers from uniform distribution
+n <- 1000  # Number of random numbers to generate
+random_numbers <- runif(n)
+
+cdf_inv = inverse(energy_cdf, lower = 0, upper = 1000)
+
+E = sapply(random_numbers, cdf_inv)
+
+
+hist(E, freq=FALSE, nclass= 19, col="lightgreen", ylim=c(0,0.2), main="Simulated data", xlab="Energy (MeV)")
+curve(energy_pdf_normalized, add = TRUE, col="red", lwd=3)
+```
+
+
+
+
+# Exercise 3
+
+• Suppose that the average number of accidents at an intersection is two per day.
+
+a) Using Markov’s inequality, find a bound for the probability that at least five accidents will occur
+tomorrow.
+
+```{r}
+avg = 2 #average number of accidents per day
+
+P_greater5 = avg / 5 #Markov inequality: the probabiìlity of having 5 accidents in a day will be at maximum this value
+
+cat("The upper bound on the probability that at least five accidents will occur
+tomorrow is ", P_greater5, "\n")
+```
+
+b) Using Poisson random variables, calculate the probability that at least five accidents will occur tomorrow. Compare this value with the bound obtained in the previous point a).
+
+```{r}
+poisson_distr = function(n, lambda) {
+    return(((lambda^n)*exp(-lambda))/factorial(n))
+}
+
+P_1_pois=poisson_distr(1,avg) #avg is equal to lambda since it is the expeted counts in a single time interval (a day)
+P_2_pois=poisson_distr(2,avg)
+P_3_pois=poisson_distr(3,avg)
+P_4_pois=poisson_distr(4,avg)
+P_greater5_pois = 1 - P_1_pois - P_2_pois - P_3_pois -P_4_pois 
+
+cat("From poisson distribution: P(n>=5) = ", P_greater5_pois, "\n", "From Markov inequality: P(n>=5) <= ", P_greater5, "\n")
+```
+
+The result is consistent with what one could expect: the probability obtained using the poisson distribution respect the Markov's inequality. 
+Nevertheless, taking the upper bound of the Markov inequality as an estimate of the true probabilty it seems to be
+not a wise choice as the two results are very different from each other.
+
+c) Let the variance of the number of accidents be two per day. Using Chebyshev’s inequality, find a
+bound on the probability that tomorrow at least five accidents will occur
+
+```{r}
+var = 2
+
+#Chebyshev's inequality
+maxP_greater5_cheby = var / (3^2) #the number of events must be at least 3 more than the average of 2 in order to obtain at least 5 events
+
+cat("The upper bound on the probability that at least five accidents will occur
+tomorrow is ", maxP_greater5_cheby, "\n")
+```
+
+I observe that the result obtained with chebyshev's inequality is much more consistent with the one obtained from 
+the poisson distribution
+
+# Exercise 4
+
+The waiting period from the time a book is ordered until it is received is a random variable with mean seven days and standard deviation two days. If Helen wants to be 95% sure that she receives a book by
+certain date, how early should she order the book?
+
+*Solution:*
+
+From Chebyshev's inequality
+
+                            P(|x-E[x]| >= k) <= ( var[x] / (k^2) )
+
+with:
+ - x the random variable associated to the number of days between the order of the book and its arrival
+ - E[x] its expected value, namely  7
+ - var[x] its variance, equal to the standard deviation squared, namely 4
+ - k is a specific number of days 
+this formula give us an upper bound on the probability that the difference between the expected number of days between order and arrive
+and the actual number of days waited would be greater than a fixed number (k)
+
+Using the following closure condition:
+
+                        P(|x-E[x]| >= k) + P(|x-E[x]| < k) = 1
+
+We obtain:
+
+                        P(|x-E[x]| < k) = 1 - P(|x-E[x]| >= k) 
+
+And by using the Chebyshev's inequality:
+
+                        P(|x-E[x]| < k) >=  1 - ( var[x] / (k^2) )
+
+Which is what we need in order to solve the problem: finding the number of days k given by the difference between the expected value and 
+the actual days of waiting that result in a probability greater than 0.95
+
+
+
+```{r}
+
+#initial parameters
+mean = 7
+std = 2
+var = std**2
+p = 0.95
+
+#findinng which k ensures a lower bound on probability >0.95
+k = seq(1,10,1) #testing days between order and arrive of the book
+for (i in k) { 
+    lower =  1-(var/i^2) #filling the list with the lower bounds on probability
+    if (lower > p) {
+        cat("\nFirst k with lower bound greater than", p ,"is k =", i, "\n\n")
+        cat("The number of days Helen should order in advance are", i+7+1, "\n\n")
+        break  # Stop iteration once the condition is met
+    }
+}
+
+```
+
+with k=9 we see that we obtain a lower bound of the number of 0.9506173 > 0.95. 
+So the number of days before the arrival that Helen should consider in ordering its book are:
+
+                            |x-7| < 9 ----> x < -2 (impossible) or x > 16
+
+In particular, with x=17 Helen will be sure to obtain its book in time with a probability greater 
+than 95%
+
+
+
+
+# Exercise 5
+
+An ordinary deck of 52 cards is divided randomly into 26 pairs. Using Chebyshev’s inequality, find an upper bound for the probability that, 
+at most, 10 pairs consist of a black and a red card.
+
+*Solution:*
+
+From Chebyshev's inequality
+
+                            P(|x-E[x]| >= k) <= ( var[x] / (k^2) )
+with:
+ - x the random variable associated to the number of pairs black-red extracted from the 26
+ - E[x] the average number of pairs black-red extracted frome the 26
+ - var[x] the variance
+ - k lower bound on the difference between the pairs extracted vs the average number of pairs extracted
+
+E[x] and var[x] are given by the Hypergeometric distribution
+
+                                             mean = n * B / N
+                                             var = (n * B * (N -B) / (N^2))*(1 - (n-1)/(N-1))
+
+with n the number of draws, B the number of black cards in the deck, N the total number of cards
+
+```{r}
+#initializing variables
+N = 52
+B = 26
+n = 26
+
+
+mean = n * B / N
+var = (n * B * (N-B) / ( N^2 ) ) * (1 - ( (n-1) / (N-1) ) )
+
+cat("mean =", mean, ",variance =", var, "\n")
+
+upper = var/3^2
+
+cat("Upper bound on probability of obtaining at least 10 red-black pairs out of the total 26:", upper, "\n")
+
+```
+
+
+
+
+# Exercise 6
+
+• In a stationary bus at the departure station, a passenger gets on the bus, on average every 30
+seconds.
+a) Compute the probability of getting more than 6 passenger after 2 minutes. Evaluate the probability
+of having less than 4 passenger after 3 minutes.
+
+```{r}
+#using poisson distribution with time dependence
+poisson = function(n,delta_t,lambda) { #delta_t is the number of time intervals of 30s you need 
+    p = ((lambda*delta_t)^n) * exp(-lambda*delta_t) / factorial(n)
+    return(p)
+}
+
+lambda = 1/30 #lambda is the average value in a time unit (1s)
+
+p_0 = poisson(0,120,lambda)
+p_1 = poisson(1,120,lambda)
+p_2 = poisson(2,120,lambda)
+p_3 = poisson(3,120,lambda)
+p_4 = poisson(4,120,lambda)
+p_5 = poisson(5,120,lambda)
+p_6plus = 1 - p_0 - p_1 - p_2 - p_3 - p_4 - p_5
+
+
+p_4minus = poisson(0,180,lambda) + poisson(1,180,lambda) + poisson(2,180,lambda) + poisson(3,180,lambda) 
+
+print(p_6plus)
+print(p_4minus)
+
+
+```
+
+
+b) Simulate the distribution of the arrival time of the third passenger and superimpose the corresponding pdf.
+
+```{r}
+num_sim = 10000
+times = rgamma(num_sim, shape = 3, rate = lambda) # the shape parameter represents the number of events (arrivals of passengers)
+
+# Plot the histogram of simulated arrival times
+hist(times, freq = FALSE, main = "Arrival times of the third passenger", xlab = "Time (s)")
+curve(dgamma(x, shape = 3, rate = lambda), col = "darkblue", add = TRUE) # Exponential distribution
+
+```
+
+there must be something wrong with densities
+
+
+
+
+c) Repeat the procedure of the point b) for the difference in arrival time between the fifth and the
+first passenger.
+
+```{r}
+
+```

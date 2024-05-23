@@ -1,0 +1,120 @@
+
+## Exercise 1 - Discrete random variable
+
+The probability distribution function of a discrete variable k is given by the zero-truncated Poisson distribution:
+P(k) = ((λ**k) * e**(−λ) ) / (k! * (1 − e**(−λ)) ) 
+for k = 1, 2, 3, . . .
+
+1) Write the R functions for the probability density and cumulative distribution functions, using the R naming convention.
+• Assuming λ = 1.4,
+
+```{r}
+lambda <- 1.4
+x <- seq(0,10)
+pois_pdf <- dpois(x,lambda) #pdf
+pois_cdf <- ppois(x, lambda) #cdf
+
+```
+
+
+2) Produce two plots showing the pdf and cdf, separately.
+
+```{r}
+barplot(pois_pdf , names=x, col="firebrick2", xlab="x", ylab="f(x)", density=50, main = sprintf("Poisson distr. lambda=%.2f",lambda), ylim=c(0,0.415), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+#plot(x,pois_pdf,type="l")
+print(pois_pdf)
+```
+
+```{r}
+barplot(pois_cdf , names=x, col="firebrick2", xlab="x", ylab="f(x)", density=50, main = sprintf("Poisson cdf. lambda=%.2f",lambda), ylim=c(0,1.1), cex.lab=1.5, cex.axis=1.25, cex.main=1.25, cex.sub=1.5)
+#plot(x,pois_cdf,type="l")
+```
+
+
+3) Compute the mean value and variance of the probability distribution using R.
+
+```{r}
+mean = sum(pois_pdf*x)
+std = sum(pois_pdf*(x**2)) - mean**2
+cat("mean: ", mean, "\nstd: ", std, "\n")
+```
+
+
+
+4) Generate a sample of random numbers from this distribution and show them in an histogram.
+Evaluate the sample mean
+
+```{r}
+sampled_data = rpois(500, lambda=lambda)
+breaks = seq(0,10)
+hist(sampled_data, col="firebrick2", xlab="x", ylab="frequency", density=50, breaks=breaks, main = sprintf("Distribution of data sampled=%.2f",lambda))
+
+cat("mean sampled data: ", mean(sampled_data),"\nlambda: ", lambda,"\n")
+
+
+```
+
+## Exercise 1 - Muon's energy distribution 
+
+The energy distribution of CR muons at sea level can be approximated as follows:
+
+p(E) = N*{1 for E < E0, (E − E0 + 1)**(−γ) for E ≥ E0
+
+where E0 = 7.25 GeV and γ = 2.7.
+
+a) Compute the normalisation factor N using R.
+
+```{r}
+
+#RICONTROLLARE####################################################
+
+
+E0 <- 1
+gamma <- 2.7
+
+energy_distr <- function(E, E0, gamma) {
+
+    if (E < E0) {
+        return (1)
+    }
+
+    else if (E >= E0) {
+       return ((E-E0+1)^(-gamma))
+    }
+}
+
+integral <- integrate(energy_distr, E0 = E0, gamma = gamma, lower = -10 , upper = 10)
+
+N <- 1 / integral
+
+cat("Normalization factor: ", N)
+
+
+#RICONTROLLARE####################################################
+
+
+```
+
+
+b) Plot the probability density function in R.
+
+```{r}
+
+```
+
+
+c) Plot the cumulative density function in R.
+
+```{r}
+
+```
+
+
+d) Compute the mean value using R
+
+```{r}
+
+```
+
+
+e) [Optional] Generate 106 random numbers from this distribution, show them in an histogram and superimpose the pdf (with a line or with a sufficient number of points).

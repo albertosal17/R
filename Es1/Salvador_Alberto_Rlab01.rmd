@@ -1,0 +1,463 @@
+# ESERCIZIO 1
+
+
+1) read the data and import in a data.frame or tibble structure
+2) merge the five data frames in an unique structure2
+
+```{r}
+data1 <- read.csv("/home/albertos/R/Data_CitiBike/JC-201902-citibike-tripdata.csv")
+data2 <- read.csv("/home/albertos/R/Data_CitiBike/JC-201903-citibike-tripdata.csv")
+data3 <- read.csv("/home/albertos/R/Data_CitiBike/JC-201904-citibike-tripdata.csv")
+data4 <- read.csv("/home/albertos/R/Data_CitiBike/JC-201905-citibike-tripdata.csv")
+data5 <- read.csv("/home/albertos/R/Data_CitiBike/JC-201906-citibike-tripdata.csv")
+
+data <- rbind(data1,data2,data3,data4,data5)
+
+str(data)
+```      
+
+
+3) check for missing data and remove it, if any
+
+```{r}  
+
+test <- is.na(data)
+
+if (sum(test)>0) {
+    print("there are missing data")
+} else if (sum(test)==0) {
+    print("no missing data")
+} else {
+    print("error")
+}
+```      
+
+
+4.1) compute the average and the median trip duration in minutes
+
+```{r}
+mean_td <- mean(data$tripduration) / 60
+median_td <- median(data$tripduration) / 60
+cat("mean trip duration: ", mean_td, " min\n")
+cat("median trip duration: ", median_td, " min\n")
+```
+
+
+4.2) evaluate the minimum and maximum trip duration; does that sound like a reasonable value?
+
+```{r}
+max_td = max(data$tripduration) / 60 
+min_td = min(data$tripduration) / 60
+
+cat("max trip duration: ", max_td, " min\n")
+cat("min trip duration: ", min_td, " min\n")
+
+```
+
+Looks like there is something wrong with max trip duration, it is not reasonable a duration of 28817 minutes (almost 20 days)
+
+
+4.3) Repeat the calculation of the average (and the median) trip duration by excluding trips longer than
+3 hours. Next, evaluate the number of skimmed entries
+
+```{r echo=FALSE}
+#loading trip durations
+data_skim = data$tripduration
+
+#removing data with trip duration less than 3 hours
+map = data_skim < 3*3600 #3600 seconds in an hour
+data_skim = data_skim[map]  
+cat("Number of skimmed entries: ", sum(map),"\n")
+
+#computing new avg and median
+mean_td <- mean(data_skim) / 60
+median_td <- median(data_skim) / 60
+cat("mean trip duration: ", mean_td, " min\n")
+cat("median trip duration: ", median_td, " min\n")
+
+max_td = max(data_skim) / 60 
+cat("max trip duration: ", max_td, " min\n")
+```
+
+
+4.4) plot the distribution of trip duration after the skimming of the previous point
+
+```{r}
+hist(data_skim/60,  main="Trip durations after skimming",xlab="trip duration (min)",border = "purple", 
+     col = "orange",nclass=30)
+```
+
+5) plot the monthly average trip duration
+
+
+```{r}
+#creating a list with trip durations for every months (from february 02 to june 06 )
+data_td_months = list(data1$tripduration,data2$tripduration,data3$tripduration,data4$tripduration,data5$tripduration)
+
+#filling a list with means trip durations per months
+means=list()
+for (i in data_td_months) {
+    means=c(means, mean(i))
+}
+
+#plotting the distribution of average trip durations per month
+plot(seq(2,6), as.numeric(means), type="p", col="red", cex=3, pch="+", xlab="months", ylab="Mean trip duration (s)")
+```
+
+6.1) plot the number of rides per day
+
+```{r}
+if (FALSE) {
+
+    names(data1)
+
+    #grouping data by day
+    init=as.Date(format(as.Date(min(data$starttime)), format = "%y-%m-%d 00:00:00 0000"))
+    last=as.Date(format(as.Date(min(data$starttime)), format = "%y-%m-%d 23:59:59 9999"))
+    one_day<-as.difftime(1, units="days")
+
+
+    date=init #start with the first recorded day
+    rides = list()
+    while(date<last) {
+        #counting the rides in a specific day
+        for (i in data$stoptime) {
+            counts=0
+            if(as.Date(i) < date+one_day) {
+                counts =count+1
+            }
+            print(counts)
+            rides = c(rides,counts) #storing the number of rides in a day
+
+            date = date+one_day #next day
+        }
+    }
+
+    #plot(seq(1,length(rides), as.numeric(rides), type="p", col="red", cex=3, pch="+")
+}
+```
+
+```{r}
+library(dplyr)
+
+#loading data
+data_rides = data 
+
+#Adding a new col with the date (%y-%m-%d) of the stop of the ride
+data_rides= mutate(data_rides, day = as.Date(starttime)) 
+
+# Grouping data by the date on which the rides has stopped
+data_rides = group_by(data_rides, day) 
+
+#counting the numbers of rides per day
+rides = summarise(data_rides, num_rides = n()) #n() is a function that counts the number of observations (rows) in each group
+
+# Print the result
+#plot(seq(length(rides$day)), rides$num_rides, xlab= "day", ylab="number of rides", type="p", col="red", cex=3, pch="+")
+breaks <- seq(min(data_rides$day), max(data_rides$day) + 4, by="4 days")
+hist(data_rides$day,  breaks = breaks,  xlab= "day", ylab="number of rides", cex=3, pch="+", main="rides per day", freq=TRUE, border = "purple", 
+     col = "orange")
+
+```
+
+
+6.2) plot the hourly distribution on weekdays and on weekends
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+#loading data
+data_rides = data 
+
+# Convert starttime to POSIXct object in order to use function weekdays
+data_rides$starttime <- as.POSIXct(data_rides$starttime)
+
+#adding columns for hour and day (litteral) of starttime 
+data_rides= mutate(data_rides, day_of_week = weekdays(starttime), hour=format(starttime, format="%H"))
+
+#filtering data distingushing between rides in weekday and weekend
+data_rides_weekday = filter(data_rides, day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+data_rides_weekend = filter(data_rides, day_of_week %in% c("Saturday", "Sunday"))
+
+#grouping data by hour of start time
+data_rides_weekday_hours = group_by(data_rides_weekday, hour)
+data_rides_weekend_hours = group_by(data_rides_weekend, hour)
+
+#counting the number of rides per hour
+data_rides_weekday_hours= summarise(data_rides_weekday_hours, num_rides = n())
+data_rides_weekend_hours= summarise(data_rides_weekend_hours, num_rides = n())
+
+
+
+# Plot the hourly distribution for weekdays
+weekday_plot <- ggplot(data_rides_weekday_hours, aes(x = hour, y = num_rides)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Hourly Distribution of Rides on Weekdays",
+       x = "Hour of the Day",
+       y = "Number of Rides") +
+  theme_minimal()
+
+# Plot the hourly distribution for weekdays
+weekend_plot <- ggplot(data_rides_weekend_hours, aes(x = hour, y = num_rides)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Hourly Distribution of Rides on Weekend",
+       x = "Hour of the Day",
+       y = "Number of Rides") +
+  theme_minimal()
+
+```
+
+```{r}
+# Print the plot
+print(weekday_plot)
+```
+    
+```{r}
+# Print the plot
+print(weekend_plot)
+```
+
+
+
+6.3) plot again the average hourly distribution on weekdays but separating customer and subscriber
+users
+
+CUSTOMERS:
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+#filtering weeday data by customers and grouping by hour as before
+data_rides_weekday_customer = filter(data_rides_weekday, usertype == "Customer")
+data_rides_weekday_customer = group_by(data_rides_weekday_customer, hour)
+data_rides_weekday_customer= summarise(data_rides_weekday_customer, num_rides = n())
+
+
+# Plot the hourly distribution for weekdays for customers
+weekday_plot_customer <- ggplot(data_rides_weekday_customer, aes(x = hour, y = num_rides)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Hourly Distribution of Rides on Weekdays for customers",
+       x = "Hour of the Day",
+       y = "Number of Rides") +
+  theme_minimal()
+
+print(weekday_plot_customer)
+
+```
+
+SUBSCRIBERS:
+```{r}
+library(dplyr)
+library(ggplot2)
+
+#filtering weeday data by subscriber and grouping by hour as before
+data_rides_weekday_subscriber = filter(data_rides_weekday, usertype == "Subscriber")
+data_rides_weekday_subscriber = group_by(data_rides_weekday_subscriber, hour)
+data_rides_weekday_subscriber= summarise(data_rides_weekday_subscriber, num_rides = n())
+
+
+# Plot the hourly distribution for weekdays for subscribers
+weekday_plot_subscriber <- ggplot(data_rides_weekday_subscriber, aes(x = hour, y = num_rides)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Hourly Distribution of Rides on Weekdays for subscribers",
+       x = "Hour of the Day",
+       y = "Number of Rides") +
+  theme_minimal()
+
+print(weekday_plot_subscriber)
+
+```
+
+
+
+7.1) using the latitude and longitude information3, evaluate the average speed (in km/h) of a user, discarding the trip lasting longer than 1 hour
+
+```{r}
+library(geosphere)
+library(dplyr)
+
+#loading data
+data_distances=data
+
+#discarding trip longer than 1 hour
+data_distances = filter(data_distances, tripduration < 3600 ) 
+
+#adding a column with trip distance in m
+#the function distHaversine (package geosphere) gives you the shortest distance between two points assuming spherical Earth.
+data_distances= mutate(data_distances, tripdistance = distHaversine(p1=cbind(start.station.latitude,start.station.longitude), p2=cbind(end.station.latitude,end.station.longitude)))
+
+#adding a column with avg speed of the trip + conversion factor from m/s to km/h
+data_distances= mutate(data_distances, avg_speed = 3.6 * (tripdistance / tripduration ))
+
+print(head(data_distances, 3))
+```
+
+
+7.2) plot the average speed as a function of route length for the following group of distances d < 500 m, 500 m < d < 1000 m, 1000 m < d < 2000 m, 2000 m < d < 3000 m, d > 3000 m and discarding
+trips longer than 1 hour
+
+```{r}
+
+library(dplyr)
+distances_ranges = c(0,500,1000,2000,3000,max(data_distances$tripdistance))
+
+avg_speeds = list()
+for (i in seq(length(distances_ranges)-1) ) {
+
+  #temporary variable
+  var = data_distances
+
+  #selecting data with tripdistance in a specific range
+  var = filter(var, tripdistance > distances_ranges[i] & tripdistance < distances_ranges[i+1])
+
+  #storing average speed
+  avg_speeds[[i]] = mean((var$tripdistance / var$tripduration)*3.6)
+
+} 
+
+barplot(as.numeric(avg_speeds), names = c("[0,500]", "[500,1000]", "[1000,2000]","[2000,3000]", ">3000"), xlab = "Ranges of trip distances (m)", ylab = "Average speed (Km/h)", main = "Avg speed VS Distance")
+
+```
+
+
+
+7.3) repeat the same graph, but show the results obtained separately for weekdays and weekends
+
+WEEKDAYS:
+```{r}
+
+library(dplyr)
+library(ggplot2)
+distances_ranges = c(0,500,1000,2000,3000,max(data_distances$tripdistance))
+
+#adding a col with name of the day
+data_distances$starttime <- as.POSIXct(data_distances$starttime)
+data_distances = mutate(data_distances, day_of_week = weekdays(starttime))
+
+#filtering weekdays
+data_distances_weekday = filter(data_distances, day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+
+
+avg_speeds = list()
+for (i in seq(length(distances_ranges)-1) ) {
+
+  #temporary variable
+  var = data_distances_weekday
+
+  #selecting data with tripdistance in a specific range
+  var = filter(var, tripdistance > distances_ranges[i] & tripdistance < distances_ranges[i+1])
+
+  #storing average speed
+  avg_speeds[[i]] = mean((var$tripdistance / var$tripduration)*3.6)
+
+} 
+
+barplot(as.numeric(avg_speeds), names = c("[0,500]", "[500,1000]", "[1000,2000]","[2000,3000]", ">3000"), xlab = "Ranges of trip distances (m)", ylab = "Average speed (Km/h)", main = "Avg speed VS Distance")
+
+```
+
+WEEKENDS:
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+distances_ranges = c(0,500,1000,2000,3000,max(data_distances$tripdistance))
+
+#adding a col with name of the day
+data_distances$starttime <- as.POSIXct(data_distances$starttime)
+data_distances = mutate(data_distances, day_of_week = weekdays(starttime))
+
+#filtering weekdays
+data_distances_weekend = filter(data_distances, day_of_week %in% c("Saturday", "Sunday"))
+
+
+avg_speeds = list()
+for (i in seq(length(distances_ranges)-1) ) {
+
+  #temporary variable
+  var = data_distances_weekday
+
+  #selecting data with tripdistance in a specific range
+  var = filter(var, tripdistance > distances_ranges[i] & tripdistance < distances_ranges[i+1])
+
+  #storing average speed
+  avg_speeds[[i]] = mean((var$tripdistance / var$tripduration)*3.6)
+
+} 
+
+barplot(as.numeric(avg_speeds), names = c("[0,500]", "[500,1000]", "[1000,2000]","[2000,3000]", ">3000"), xlab = "Ranges of trip distances (m)", ylab = "Average speed (Km/h)", main = "Avg speed VS Distance")
+
+```
+
+
+
+8.1) find the most common start station and the least popular end station
+
+```{r}
+library(dplyr)
+
+start_station = data %>% 
+  add_count(start.station.name, sort = TRUE) %>% #sorting number of occurence of starting stations in descending order
+  slice_head(n=1) #selecting the most common starting station
+
+
+end_station = data %>% 
+  add_count(end.station.name, sort = TRUE) %>% #sorting number of occurence of ending stations in descending order
+  slice_head(n=1) #selecting the most common ending station
+
+print(start_station$start.station.name)
+print(end_station$end.station.name)
+
+```
+
+8.2) show the distribution of start stations
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Counting occurrences of each start station
+by_start <- data %>%
+  count(start.station.name, sort = TRUE) %>%
+  rename(station_name = start.station.name, frequency = n)
+
+
+# Ploting the bar chart
+plot <- ggplot(by_start, aes(x = station_name, y = frequency)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  labs(x = "Start station name", y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) #rotating x label to be vertical
+
+print(plot)
+
+```
+
+
+
+8.3) find the three most common routes (start and end station) and the three least popular ones
+
+```{r}
+library(dplyr)
+
+# Determining the top 3 most common combinations of start and end stations
+most_common <- data %>%
+  count(start.station.name, end.station.name, sort = TRUE) %>%
+  rename(start_station = start.station.name, end_station = end.station.name, frequency = n) %>%
+  distinct(start_station, end_station, .keep_all = TRUE) %>%
+  arrange(desc(frequency)) %>%
+  slice_head(n = 3)
+
+# Determining the bottom 3 least common combinations of start and end stations
+least:popular <- data %>%
+  count(start.station.name, end.station.name, sort = TRUE) %>%
+  rename(start_station = start.station.name, end_station = end.station.name, frequency = n) %>%
+  distinct(start_station, end_station, .keep_all = TRUE) %>%
+  arrange(desc(frequency)) %>%
+  slice_tail(n = 3)
+
+
+```
